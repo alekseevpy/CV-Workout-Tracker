@@ -150,10 +150,12 @@ venv.bak/
 .notebooks/input
 .notebooks/output
 .notebooks/weights
+.DS_Store
 
 notebooks/input/
 notebooks/output/
 notebooks/weights/
+notebooks/.DS_Store
 
 # Spyder project settings
 .spyderproject
