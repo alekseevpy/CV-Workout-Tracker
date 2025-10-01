@@ -1,0 +1,35 @@
+name: Workflows
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-and-tests:
+    name: Lint & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+          pip install flake8 pytest
+
+      - name: Lint all Python in backend and tests
+        run: |
+          flake8 backend tests
+
+      - name: Run all tests
+        run: |
+          pytest tests --maxfail=1 --disable-warnings -q
