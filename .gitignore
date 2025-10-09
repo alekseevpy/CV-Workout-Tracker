@@ -209,5 +209,4 @@ __marimo__/
 
 # Custom
 vlm-research/.kaggle
-vlm-research/kaggle_dataset
-vlm-research/custom_dataset
+vlm-research/*_dataset*
