@@ -210,3 +210,5 @@ __marimo__/
 # Custom
 vlm-research/.kaggle
 vlm-research/*_dataset*
+vlm-research/output_frames*
+equipment_detection/dataset*
