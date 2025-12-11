@@ -94,10 +94,12 @@ def run_detection_on_video(video_path, model=None, progress_bar=None):
     
     # Создать временный файл для выходного видео
     temp_dir = tempfile.gettempdir()
-    output_path = os.path.join(temp_dir, "processed_video.mp4")
+    # output_path = os.path.join(temp_dir, "processed_video.mp4")
+    output_path = os.path.join(temp_dir, "processed_video.webm")
     
     # Инициализировать VideoWriter
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*'VP80')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     frame_idx = 0
@@ -147,9 +149,12 @@ def run_pose_estimation_on_video(video_path, model=None, progress_bar=None):
 
     # Создать временный файл для выходного видео
     temp_dir = tempfile.gettempdir()
-    output_path = os.path.join(temp_dir, "pose_video.mp4")
-
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # output_path = os.path.join(temp_dir, "pose_video.mp4")
+    output_path = os.path.join(temp_dir, "pose_video.webm")
+    
+    # Инициализировать VideoWriter
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*'VP80')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     frame_idx = 0
@@ -268,6 +273,9 @@ with tab1:
             key="process_btn"
         )
         
+        if "detection_processed_path" not in st.session_state:
+            st.session_state.detection_processed_path = None
+
         if process_button:
             with st.spinner("Обрабатываю видео..."):
                 progress_bar = st.progress(0)
@@ -280,14 +288,16 @@ with tab1:
                 
                 progress_bar.empty()
                 st.success(f"✅ Видео успешно обработано")
-            
+            st.session_state.detection_processed_path = output_video_path
+
+        if st.session_state.detection_processed_path is not None:
             st.subheader("Обработанное видео")
-            with open(output_video_path, "rb") as video_file:
+            with open(st.session_state.detection_processed_path, "rb") as video_file:
                 st.video(video_file)
             
             st.divider()
             
-            with open(output_video_path, "rb") as video_file:
+            with open(st.session_state.detection_processed_path, "rb") as video_file:
                 st.download_button(
                     label="Скачать видео",
                     data=video_file.read(),
@@ -338,6 +348,9 @@ with tab2:
             key="analyze_pose_btn"
         )
 
+        if "pose_processed_path" not in st.session_state:
+            st.session_state.pose_processed_path = None
+
         if analyze_button:
             with st.spinner("Анализирую технику..."):
                 progress_bar = st.progress(0)
@@ -350,21 +363,24 @@ with tab2:
 
                 progress_bar.empty()
                 st.success(f"✅ Видео успешно обработано")
+            st.session_state.pose_processed_path = pose_video_out_path
+            st.session_state.pose_recommendations_text = recommendations_text
 
+        if st.session_state.pose_processed_path is not None:                
             col_video, col_text = st.columns([2, 1])
 
             with col_video:
                 st.subheader("Видео с определением позы")
-                with open(pose_video_out_path, "rb") as video_file:
+                with open(st.session_state.pose_processed_path, "rb") as video_file:
                     st.video(video_file)
 
             with col_text:
                 st.subheader("Рекомендации по выполнению")
-                st.text(recommendations_text)
+                st.text(st.session_state.pose_recommendations_text)
 
             st.divider()
 
-            with open(pose_video_out_path, "rb") as video_file:
+            with open(st.session_state.pose_processed_path, "rb") as video_file:
                 st.download_button(
                     label="Скачать видео",
                     data=video_file.read(),
