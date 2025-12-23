@@ -208,7 +208,7 @@ __marimo__/
 
 
 # Custom
-vlm-research/.kaggle
-vlm-research/*_dataset*
-vlm-research/output_frames*
+vlm-research/*
 equipment_detection/dataset*
+backend/__pycache__
+backend/yolo*.pt

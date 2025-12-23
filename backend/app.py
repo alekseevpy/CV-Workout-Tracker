@@ -3,9 +3,24 @@ import cv2
 import numpy as np
 import tempfile
 import os
-from pathlib import Path
+import sys
+import torch
 
-# run with "streamlit run backend/app.py"
+from ultralytics import YOLO
+from pathlib import Path
+from main import process_exercise_video_with_loaded_models
+from inference import load_lstm_model
+
+# run from folder backend with "streamlit run app.py"
+
+@st.cache_resource
+def load_models(model_path: str):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    lstm_model = load_lstm_model(model_path, device)
+    yolo_model = YOLO('yolo11m-pose.pt')
+    return lstm_model, yolo_model, device
+
+lstm_model, yolo_model, device = load_models("./best_pose_lstm.pth")
 
 st.set_page_config(
     page_title="Активность в воркаут зоне",
@@ -72,60 +87,46 @@ def get_video_properties(video_path):
     }
 
 
-def run_detection_on_video(video_path, model=None, progress_bar=None):
+def convert_mp4_to_webm(input_path: str):
+    """Конвертирует MP4 → WebM для Streamlit"""
+    output_path = input_path.rsplit('.', 1)[0] + '.webm'
+    cap = cv2.VideoCapture(input_path)
+    fourcc = cv2.VideoWriter_fourcc(*'VP80')  # VP8 для WebM
+    out = cv2.VideoWriter(output_path, fourcc, 30.0, (int(cap.get(3)), int(cap.get(4))))
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        out.write(frame)
+    
+    cap.release()
+    out.release()
+    return output_path
+
+
+def run_detection_on_video(video_path):
     """
     Запустить детекцию на видео
     
     Args:
         video_path: путь к видео файлу
-        model: модель для детекции (если None, возвращает исходное видео)
-        progress_bar: Streamlit progress bar для отслеживания прогресса
+        model_path: путь к весу модели (если None, возвращает исходное видео)
     
     Returns:
         путь к обработанному видео
     """
-    cap = cv2.VideoCapture(video_path)
     
-    # Получить свойства видео
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    # Создать временный файл для выходного видео
     temp_dir = tempfile.gettempdir()
-    # output_path = os.path.join(temp_dir, "processed_video.mp4")
-    output_path = os.path.join(temp_dir, "processed_video.webm")
+    output_dir, tracks_path, predictions_path, video_output = process_exercise_video_with_loaded_models(
+        video_path=video_path,
+        lstm_model=lstm_model,
+        yolo_model=yolo_model,
+        device=device,
+        output_dir=temp_dir
+    )
     
-    # Инициализировать VideoWriter
-    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fourcc = cv2.VideoWriter_fourcc(*'VP80')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    
-    frame_idx = 0
-    
-    while True:
-        ret, frame = cap.read()
-        
-        if not ret:
-            break
-        
-        if model is not None:
-            pass # todo надо сюда подгружать нашу модель
-            
-        
-        out.write(frame)
-        frame_idx += 1
-        
-        # Обновить progress bar
-        if progress_bar is not None:
-            progress = frame_idx / frame_count
-            progress_bar.progress(progress)
-    
-    cap.release()
-    out.release()
-    
-    return output_path
+    return video_output
+    return convert_mp4_to_webm(video_output)
 
 def run_pose_estimation_on_video(video_path, model=None, progress_bar=None):
     """
@@ -221,13 +222,13 @@ def display_video_preview(video_path, max_frames=5):
 
 st.markdown("<h1 class='main-header'>Проект для отслеживания активности в воркаут зоне<br/>и оценки качества выполнения упражнения</h1>", unsafe_allow_html=True)
 st.markdown("""
-    - **Вкладка "Детекция объектов":** Загрузите видео с воркаут площадки, и приложение проведет детекцию тренажеров и выполняемых упражнений. Обработанное видео с bounding boxes будет доступно для скачивания.
-    - **Вкладка "Анализ техники":** Загрузите видео с выполнением упражнения, и приложение проведет анализ техники выполнения упражнений (pose estimation + рекомендации)
+    - **Вкладка "Классификатор упражнений":** Загрузите видео с воркаут площадки, и приложение проведет классификацию выполняемых упражнений. Обработанное видео будет доступно для скачивания.
+    - **Вкладка "Анализатор техники":** Загрузите видео с выполнением упражнения, и приложение проведет анализ техники выполнения упражнений (pose estimation + рекомендации). Обработанное видео будет доступно для скачивания.
 """)
 
 st.markdown("<div class='info-box'>Видео должно быть в формате MP4, MOV или AVI</div>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["Детекция объектов", "Анализ техники"])
+tab1, tab2 = st.tabs(["Классификатор упражнений", "Анализатор техники"])
 
 # ==================== TAB 1: DETECTION ====================
 with tab1:
@@ -277,16 +278,8 @@ with tab1:
             st.session_state.detection_processed_path = None
 
         if process_button:
-            with st.spinner("Обрабатываю видео..."):
-                progress_bar = st.progress(0)
-                
-                output_video_path = run_detection_on_video(
-                    video_path,
-                    model=None, # todo вставить наш пайплайн
-                    progress_bar=progress_bar
-                )
-                
-                progress_bar.empty()
+            with st.spinner("Обрабатываю видео..."):                
+                output_video_path = run_detection_on_video(video_path)                
                 st.success(f"✅ Видео успешно обработано")
             st.session_state.detection_processed_path = output_video_path
 
