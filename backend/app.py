@@ -10,17 +10,21 @@ from ultralytics import YOLO
 from pathlib import Path
 from main import process_exercise_video_with_loaded_models
 from inference import load_lstm_model
+from run_s3d import load_model_s3d, inference
 
 # run from folder backend with "streamlit run app.py"
+
+class_names_s3d = ['chest fly machine', 'leg raises', 'pull Up', 'push-up', 'squat', 'tricep dips']
 
 @st.cache_resource
 def load_models(model_path: str):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    lstm_model = load_lstm_model(model_path, device)
-    yolo_model = YOLO('yolo11m-pose.pt')
-    return lstm_model, yolo_model, device
+    lstm_model_for_poses = load_lstm_model(model_path, device)
+    yolo_model_for_poses = YOLO('yolo11m-pose.pt')
+    s3d_model_for_poses = load_model_s3d('./best_model_s3d.pth', device, class_names_s3d)
+    return lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, device
 
-lstm_model_for_poses, yolo_model_for_poses, device = load_models("./best_pose_lstm.pth")
+lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, device = load_models("./best_pose_lstm.pth")
 
 st.set_page_config(
     page_title="Активность в воркаут зоне",
@@ -110,7 +114,6 @@ def run_detection_on_video(video_path):
     
     Args:
         video_path: путь к видео файлу
-        model_path: путь к весу модели (если None, возвращает исходное видео)
     
     Returns:
         путь к обработанному видео
@@ -126,7 +129,25 @@ def run_detection_on_video(video_path):
     )
     
     return video_output
-    return convert_mp4_to_webm(video_output)
+    # return convert_mp4_to_webm(video_output)
+
+
+def run_detection_on_video_s3d(video_path):
+    """
+    Запустить детекцию на видео
+    
+    Args:
+        video_path: путь к видео файлу
+    
+    Returns:
+        путь к обработанному видео
+    """
+    
+    temp_dir = tempfile.gettempdir()
+    video_output = inference(s3d_model_for_poses, device, class_names_s3d, video_path, temp_dir, "exercise_tracking_output_s3d.mp4")
+    
+    return video_output
+    # return convert_mp4_to_webm(video_output)
 
 def run_pose_estimation_on_video(video_path, model=None, progress_bar=None):
     """
@@ -223,12 +244,13 @@ def display_video_preview(video_path, max_frames=5):
 st.markdown("<h1 class='main-header'>Проект для отслеживания активности в воркаут зоне<br/>и оценки качества выполнения упражнения</h1>", unsafe_allow_html=True)
 st.markdown("""
     - **Вкладка "Классификатор упражнений":** Загрузите видео с воркаут площадки, и приложение проведет классификацию выполняемых упражнений. Обработанное видео будет доступно для скачивания.
+    - **Вкладка "Классификатор упражнений s3d":** Загрузите видео с воркаут площадки, и приложение проведет классификацию выполняемых упражнений. Обработанное видео будет доступно для скачивания.
     - **Вкладка "Анализатор техники":** Загрузите видео с выполнением упражнения, и приложение проведет анализ техники выполнения упражнений (pose estimation + рекомендации). Обработанное видео будет доступно для скачивания.
 """)
 
 st.markdown("<div class='info-box'>Видео должно быть в формате MP4, MOV или AVI</div>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["Классификатор упражнений", "Анализатор техники"])
+tab1, tab2, tab3 = st.tabs(["Классификатор упражнений", "Классификатор упражнений s3d", "Анализатор техники"])
 
 # ==================== TAB 1: DETECTION ====================
 with tab1:
@@ -239,7 +261,8 @@ with tab1:
         uploaded_file = st.file_uploader(
             "Выберите видео файл",
             type=["mp4", "mov", "avi"],
-            help="Статичное видео с воркаут площадки"
+            help="Статичное видео с воркаут площадки",
+            key="process_lstm_video_uploader"
         )
 
     with col2:
@@ -278,6 +301,7 @@ with tab1:
             st.session_state.detection_processed_path = None
 
         if process_button:
+            st.session_state.detection_processed_path = None
             with st.spinner("Обрабатываю видео..."):                
                 output_video_path = run_detection_on_video(video_path)                
                 st.success(f"✅ Видео успешно обработано")
@@ -285,10 +309,10 @@ with tab1:
 
         if st.session_state.detection_processed_path is not None:
             st.subheader("Обработанное видео")
-            with open(st.session_state.detection_processed_path, "rb") as video_file:
-                st.video(video_file)
+            # with open(st.session_state.detection_processed_path, "rb") as video_file:
+            #     st.video(video_file)
             
-            st.divider()
+            # st.divider()
             
             with open(st.session_state.detection_processed_path, "rb") as video_file:
                 st.download_button(
@@ -299,8 +323,79 @@ with tab1:
                     use_container_width=True
                 )
 
-# ==================== TAB 2: POSE ANALYSIS ====================
+# ==================== TAB 2: DETECTION s3d ====================
 with tab2:
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Загрузить видео")
+        uploaded_file_s3d = st.file_uploader(
+            "Выберите видео файл",
+            type=["mp4", "mov", "avi"],
+            help="Статичное видео с воркаут площадки",
+            key="process_s3d_video_uploader"
+        )
+
+    with col2:
+        st.subheader("Информация о видео")
+        video_info_placeholder = st.empty()
+
+    if uploaded_file_s3d is not None:
+        st.success(f"✅ Файл загружен: {uploaded_file_s3d.name}")
+        
+        # Сохранить загруженный файл
+        video_path_s3d = save_uploaded_file(uploaded_file_s3d)
+        
+        # Получить информацию о видео
+        video_props_s3d = get_video_properties(video_path_s3d)
+        
+        with video_info_placeholder.container():
+            st.markdown(f"""
+                - **Разрешение:** {video_props_s3d['width']}x{video_props_s3d['height']}
+                - **FPS:** {video_props_s3d['fps']}
+                - **Кол-во фреймов:** {video_props_s3d['frame_count']}
+                - **Длительность:** {video_props_s3d['duration']:.2f} сек
+            """)
+        
+        st.subheader("Превью видео")
+        display_video_preview(video_path_s3d, max_frames=5)
+        
+        st.divider()
+        
+        process_s3d_button = st.button(
+            "Запустить детекцию",
+            use_container_width=True,
+            key="process_s3d_btn"
+        )
+        
+        if "detection_processed_path_s3d" not in st.session_state:
+            st.session_state.detection_processed_path_s3d = None
+
+        if process_s3d_button:
+            st.session_state.detection_processed_path_s3d = None
+            with st.spinner("Обрабатываю видео..."):                
+                output_video_path = run_detection_on_video_s3d(video_path_s3d)                
+                st.success(f"✅ Видео успешно обработано")
+            st.session_state.detection_processed_path_s3d = output_video_path
+
+        if st.session_state.detection_processed_path_s3d is not None:
+            st.subheader("Обработанное видео")
+            # with open(st.session_state.detection_processed_path_s3d, "rb") as video_file:
+            #     st.video(video_file)
+            
+            # st.divider()
+            
+            with open(st.session_state.detection_processed_path_s3d, "rb") as video_file:
+                st.download_button(
+                    label="Скачать видео",
+                    data=video_file.read(),
+                    file_name="processed_s3d_workout_video.mp4",
+                    mime="video/mp4",
+                    use_container_width=True
+                )
+
+# ==================== TAB 3: POSE ANALYSIS ====================
+with tab3:
     col1, col2 = st.columns([2, 1])
 
     with col1:
