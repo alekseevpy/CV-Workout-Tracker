@@ -20,7 +20,7 @@ def load_models(model_path: str):
     yolo_model = YOLO('yolo11m-pose.pt')
     return lstm_model, yolo_model, device
 
-lstm_model, yolo_model, device = load_models("./best_pose_lstm.pth")
+lstm_model_for_poses, yolo_model_for_poses, device = load_models("./best_pose_lstm.pth")
 
 st.set_page_config(
     page_title="Активность в воркаут зоне",
@@ -119,8 +119,8 @@ def run_detection_on_video(video_path):
     temp_dir = tempfile.gettempdir()
     output_dir, tracks_path, predictions_path, video_output = process_exercise_video_with_loaded_models(
         video_path=video_path,
-        lstm_model=lstm_model,
-        yolo_model=yolo_model,
+        lstm_model=lstm_model_for_poses,
+        yolo_model=yolo_model_for_poses,
         device=device,
         output_dir=temp_dir
     )

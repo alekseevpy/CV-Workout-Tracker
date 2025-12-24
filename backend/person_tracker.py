@@ -17,9 +17,9 @@ def process_video_for_lstm(video_path, yolo_model, min_visibility_seconds=5, min
         'tracker_type': 'bytetrack',
         'track_high_thresh': 0.6,
         'track_low_thresh': 0.3,
-        'new_track_thresh': 0.8,
-        'track_buffer': 15,
-        'match_thresh': 0.72,
+        'new_track_thresh': 0.7,
+        'track_buffer': 10,
+        'match_thresh': 0.70,
         'fuse_score': True
     }
 
