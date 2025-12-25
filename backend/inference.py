@@ -6,7 +6,7 @@ def load_lstm_model(model_path, device='cpu'):
     """
     Загружает LSTM модель с весами
     """
-    print(f"Загрузка модели из {model_path}...")
+    # print(f"Загрузка модели из {model_path}...")
 
     model = EnhancedPoseLSTM(
         input_size=51,
@@ -21,7 +21,7 @@ def load_lstm_model(model_path, device='cpu'):
     model.to(device)
     model.eval()
 
-    print(f"Модель загружена на {device}")
+    # print(f"Модель загружена на {device}")
     return model
 
 def classify_person_sequence(segment, lstm_model, preprocessor, class_names, device='cpu'):
