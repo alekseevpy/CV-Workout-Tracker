@@ -11,20 +11,29 @@ from pathlib import Path
 from main import process_exercise_video_with_loaded_models
 from inference import load_lstm_model
 from run_s3d import load_model_s3d, inference
+from equipment_inference import run_equipment_inference_on_video
 
 # run from folder backend with "streamlit run app.py"
 
 class_names_s3d = ['chest fly machine', 'leg raises', 'pull Up', 'push-up', 'squat', 'tricep dips']
 
 @st.cache_resource
-def load_models(model_path: str):
+def load_models():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    lstm_model_for_poses = load_lstm_model(model_path, device)
+    print(f"device {device}")
+    lstm_model_for_poses = load_lstm_model("./best_pose_lstm.pth", device)
+    print("lstm_model_for_poses loaded")
     yolo_model_for_poses = YOLO('yolo11m-pose.pt')
+    yolo_model_for_poses.to(device)
+    print("yolo_model_for_poses loaded")
     s3d_model_for_poses = load_model_s3d('./best_model_s3d.pth', device, class_names_s3d)
-    return lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, device
+    print("s3d_model_for_poses loaded")
+    yolo_model_for_equipment = YOLO("./best_equipment.pt")
+    yolo_model_for_equipment.to(device)
+    print("yolo_model_for_equipment loaded")
+    return lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, yolo_model_for_equipment, device
 
-lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, device = load_models("./best_pose_lstm.pth")
+lstm_model_for_poses, yolo_model_for_poses, s3d_model_for_poses, yolo_model_for_equipment, device = load_models()
 
 st.set_page_config(
     page_title="Активность в воркаут зоне",
@@ -216,6 +225,19 @@ def run_pose_estimation_on_video(video_path, model=None, progress_bar=None):
     return output_path, recommendations_text
 
 
+def run_equipment_detection(video_path):
+    temp_dir = tempfile.gettempdir()
+    output_path = os.path.join(temp_dir, "equipment_detection.mp4")
+    run_equipment_inference_on_video(
+        input_video_path=video_path,
+        output_video_path=output_path,
+        model=yolo_model_for_equipment,
+        conf_thres=0.5,
+    )
+
+    return output_path
+
+
 def display_video_preview(video_path, max_frames=5):
     """Показать превью видео (несколько фреймов)"""
     cap = cv2.VideoCapture(video_path)
@@ -245,12 +267,13 @@ st.markdown("<h1 class='main-header'>Проект для отслеживани�
 st.markdown("""
     - **Вкладка "Классификатор упражнений":** Загрузите видео с воркаут площадки, и приложение проведет классификацию выполняемых упражнений. Обработанное видео будет доступно для скачивания.
     - **Вкладка "Классификатор упражнений s3d":** Загрузите видео с воркаут площадки, и приложение проведет классификацию выполняемых упражнений. Обработанное видео будет доступно для скачивания.
-    - **Вкладка "Анализатор техники":** Загрузите видео с выполнением упражнения, и приложение проведет анализ техники выполнения упражнений (pose estimation + рекомендации). Обработанное видео будет доступно для скачивания.
+    - **Вкладка "Анализатор техники":** **Work In Progress** Загрузите видео с выполнением упражнения, и приложение проведет анализ техники выполнения упражнений (pose estimation + рекомендации). Обработанное видео будет доступно для скачивания.
+    - **Вкладка "Детекция тренажеров":** Загрузите статичное видео с воркаут площадки, и приложение проведет анализ наличия тренажеров на ней. Обработанное видео будет доступно для скачивания.
 """)
 
 st.markdown("<div class='info-box'>Видео должно быть в формате MP4, MOV или AVI</div>", unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["Классификатор упражнений", "Классификатор упражнений s3d", "Анализатор техники"])
+tab1, tab2, tab3, tab4 = st.tabs(["Классификатор упражнений", "Классификатор упражнений s3d", "Анализатор техники", "Детекция тренажеров"])
 
 # ==================== TAB 1: DETECTION ====================
 with tab1:
@@ -258,7 +281,7 @@ with tab1:
 
     with col1:
         st.subheader("Загрузить видео")
-        uploaded_file = st.file_uploader(
+        uploaded_lstm_pose_file = st.file_uploader(
             "Выберите видео файл",
             type=["mp4", "mov", "avi"],
             help="Статичное видео с воркаут площадки",
@@ -267,18 +290,18 @@ with tab1:
 
     with col2:
         st.subheader("Информация о видео")
-        video_info_placeholder = st.empty()
+        video_lstm_info_placeholder = st.empty()
 
-    if uploaded_file is not None:
-        st.success(f"✅ Файл загружен: {uploaded_file.name}")
+    if uploaded_lstm_pose_file is not None:
+        st.success(f"✅ Файл загружен: {uploaded_lstm_pose_file.name}")
         
         # Сохранить загруженный файл
-        video_path = save_uploaded_file(uploaded_file)
+        video_path = save_uploaded_file(uploaded_lstm_pose_file)
         
         # Получить информацию о видео
         video_props = get_video_properties(video_path)
         
-        with video_info_placeholder.container():
+        with video_lstm_info_placeholder.container():
             st.markdown(f"""
                 - **Разрешение:** {video_props['width']}x{video_props['height']}
                 - **FPS:** {video_props['fps']}
@@ -320,7 +343,8 @@ with tab1:
                     data=video_file.read(),
                     file_name="processed_workout_video.mp4",
                     mime="video/mp4",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="lstm_download_btn"
                 )
 
 # ==================== TAB 2: DETECTION s3d ====================
@@ -338,7 +362,7 @@ with tab2:
 
     with col2:
         st.subheader("Информация о видео")
-        video_info_placeholder = st.empty()
+        video_s3d_info_placeholder = st.empty()
 
     if uploaded_file_s3d is not None:
         st.success(f"✅ Файл загружен: {uploaded_file_s3d.name}")
@@ -349,7 +373,7 @@ with tab2:
         # Получить информацию о видео
         video_props_s3d = get_video_properties(video_path_s3d)
         
-        with video_info_placeholder.container():
+        with video_s3d_info_placeholder.container():
             st.markdown(f"""
                 - **Разрешение:** {video_props_s3d['width']}x{video_props_s3d['height']}
                 - **FPS:** {video_props_s3d['fps']}
@@ -391,7 +415,8 @@ with tab2:
                     data=video_file.read(),
                     file_name="processed_s3d_workout_video.mp4",
                     mime="video/mp4",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="s3d_download_btn"
                 )
 
 # ==================== TAB 3: POSE ANALYSIS ====================
@@ -474,5 +499,79 @@ with tab3:
                     data=video_file.read(),
                     file_name="pose_workout_video.mp4",
                     mime="video/mp4",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="pose_analysis_download_btn"
+                )
+
+
+# ==================== TAB 4: EQUIPMENT DETECTION ====================
+with tab4:
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Загрузить видео")
+        uploaded_equipment_file = st.file_uploader(
+            "Выберите видео файл",
+            type=["mp4", "mov", "avi"],
+            help="Статичное видео с воркаут площадки",
+            key="process_equipment_video_uploader"
+        )
+
+    with col2:
+        st.subheader("Информация о видео")
+        video_equipment_info_placeholder = st.empty()
+
+    if uploaded_equipment_file is not None:
+        st.success(f"✅ Файл загружен: {uploaded_equipment_file.name}")
+        
+        # Сохранить загруженный файл
+        equipment_video_path = save_uploaded_file(uploaded_equipment_file)
+        
+        # Получить информацию о видео
+        equipment_video_props = get_video_properties(equipment_video_path)
+        
+        with video_equipment_info_placeholder.container():
+            st.markdown(f"""
+                - **Разрешение:** {equipment_video_props['width']}x{equipment_video_props['height']}
+                - **FPS:** {equipment_video_props['fps']}
+                - **Кол-во фреймов:** {equipment_video_props['frame_count']}
+                - **Длительность:** {equipment_video_props['duration']:.2f} сек
+            """)
+        
+        st.subheader("Превью видео")
+        display_video_preview(equipment_video_path, max_frames=5)
+        
+        st.divider()
+        
+        process_equipment_button = st.button(
+            "Запустить детекцию",
+            use_container_width=True,
+            key="process_equipment_btn"
+        )
+        
+        if "equipment_detection_processed_path" not in st.session_state:
+            st.session_state.equipment_detection_processed_path = None
+
+        if process_equipment_button:
+            st.session_state.equipment_detection_processed_path = None
+            with st.spinner("Обрабатываю видео..."):                
+                output_video_path = run_equipment_detection(equipment_video_path)                
+                st.success(f"✅ Видео успешно обработано")
+            st.session_state.equipment_detection_processed_path = output_video_path
+
+        if st.session_state.equipment_detection_processed_path is not None:
+            st.subheader("Обработанное видео")
+            # with open(st.session_state.equipment_detection_processed_path, "rb") as video_file:
+            #     st.video(video_file)
+            
+            # st.divider()
+            
+            with open(st.session_state.equipment_detection_processed_path, "rb") as video_file:
+                st.download_button(
+                    label="Скачать видео",
+                    data=video_file.read(),
+                    file_name="processed_equipment_detection_video.mp4",
+                    mime="video/mp4",
+                    use_container_width=True,
+                    key="equipment_download_btn"
                 )
