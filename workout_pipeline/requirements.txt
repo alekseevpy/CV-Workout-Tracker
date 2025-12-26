@@ -1,0 +1,8 @@
+torch
+torchvision
+ultralytics
+opencv-python
+numpy
+tqdm
+pyyaml
+lap>=0.5.12
