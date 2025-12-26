@@ -65,9 +65,7 @@
 
 ![<img width="454" height="415" alt="image" src="https://github.com/user-attachments/assets/0a849b65-89e3-415c-82bf-e914bdf72d1d" />
 
-! <img width="650" height="663" alt="image" src="https://github.com/user-attachments/assets/48a4f226-13dd-44b0-bb4e-daee847882d0" />
-
-! <img width="588" height="678" alt="image" src="https://github.com/user-attachments/assets/a4b08c83-6242-48b5-ab37-2661b5997e7a" />
+! <img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/a4b08c83-6242-48b5-ab37-2661b5997e7a" />
 
 Рекомендации генерируются с использованием LLM (Gemini). На основе численных метрик выделяются топ-6 проблемных мест, которые передаются в строго структурированном промпте модели. LLM формирует понятные, обоснованные и воспроизводимые советы по коррекции техники, не анализируя видео напрямую, а лишь интерпретируя готовые метрики. В результате пользователь получает персонализированные рекомендации по улучшению выполнения упражнений.
 
