@@ -138,11 +138,25 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.venv311
 env/
 venv/
+venv311/ 
 ENV/
 env.bak/
 venv.bak/
+
+# test files
+check.ipynb
+# static dirs
+mmpose_mvp/data_mvp/
+notebooks/mmpose/input/
+notebooks/mmpose/output/
+notebooks/mmpose/weights/
+notebooks/mmpose/input_compare_angles/
+notebooks/mmpose/output_compare_angles/
+notebooks/.DS_Store
+.DS_Store
 
 # Spyder project settings
 .spyderproject
