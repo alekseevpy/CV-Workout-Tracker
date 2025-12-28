@@ -16,7 +16,9 @@
 Для данной задачи собран и размечен единственный в открытом доступе датасет — "Workout equipment for object detection", содержащий 1881 пару изображение-разметка.
 
 ![Пример 1](https://github.com/user-attachments/assets/c913c116-2d95-463e-8f15-515e32248bde)
+
 ![Пример 2](https://github.com/user-attachments/assets/54052ea3-97b3-4925-9b1b-f1fb2f2de56c)
+
 ![Пример 3](https://github.com/user-attachments/assets/9498c875-1bbc-4faf-895d-785c1c20607b)
 
 ### Метрики на тестовой выборке:
@@ -63,9 +65,9 @@
 
 **Пример визуализации сравнения:**
 
-![<img width="454" height="415" alt="image" src="https://github.com/user-attachments/assets/0a849b65-89e3-415c-82bf-e914bdf72d1d" />
+[<img width="454" height="415" alt="image" src="https://github.com/user-attachments/assets/0a849b65-89e3-415c-82bf-e914bdf72d1d" />
 
-! <img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/a4b08c83-6242-48b5-ab37-2661b5997e7a" />
+<img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/a4b08c83-6242-48b5-ab37-2661b5997e7a" />
 
 Рекомендации генерируются с использованием LLM (Gemini). На основе численных метрик выделяются топ-6 проблемных мест, которые передаются в строго структурированном промпте модели. LLM формирует понятные, обоснованные и воспроизводимые советы по коррекции техники, не анализируя видео напрямую, а лишь интерпретируя готовые метрики. В результате пользователь получает персонализированные рекомендации по улучшению выполнения упражнений.
 
